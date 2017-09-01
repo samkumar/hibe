@@ -51,6 +51,9 @@ type Params struct {
 	g2 *bn256.G2
 	g3 *bn256.G2
 	h  []*bn256.G2
+
+	// Some cached state
+	pairing *bn256.GT
 }
 
 // MasterKey represents the key for a hierarchy that can create a key for any
@@ -224,8 +227,12 @@ func Encrypt(random io.Reader, params *Params, id []*big.Int, message *bn256.GT)
 		return nil, err
 	}
 
-	ciphertext.a = bn256.Pair(params.g1, params.g2)
-	ciphertext.a.ScalarMult(ciphertext.a, s)
+	if params.pairing == nil {
+		params.pairing = bn256.Pair(params.g1, params.g2)
+	}
+
+	ciphertext.a = new(bn256.GT)
+	ciphertext.a.ScalarMult(params.pairing, s)
 	ciphertext.a.Add(ciphertext.a, message)
 
 	ciphertext.b = new(bn256.G1).ScalarMult(params.g, s)
