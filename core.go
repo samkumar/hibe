@@ -3,33 +3,40 @@
 // Goh.
 //
 // The algorithms call for us to use a group G that is bilinear, i.e,
-// there exists a bilinear map e: G x G -> G1. However, the bn256 library uses
+// there exists a bilinear map e: G x G -> G2. However, the bn256 library uses
 // a slightly different definition of bilinear groups: it defines it as a
-// triple of groups (G1, G2, GT) such that there exists a bilinear map
-// e: G1 x G2 -> GT. The paper calls this an "asymmetric bilinear group".
+// triple of groups (G2, G1, GT) such that there exists a bilinear map
+// e: G2 x G1 -> GT. The paper calls this an "asymmetric bilinear group".
 //
-// It turns out that we are lucky. Both G1 and G2, as implemented in bn256 share
+// It turns out that we are lucky. Both G2 and G1, as implemented in bn256 share
 // the same order, and that that order (bn256.Order) happens to be a prime
-// number p. Therefore G1 and G2 are both isomorphic to Zp. This is important
+// number p. Therefore G2 and G1 are both isomorphic to Zp. This is important
 // for two reasons. First, the algorithm requires G to be a cyclic group.
-// Second, this implies that G1 and G2 are isomorphic to each other. This means
+// Second, this implies that G2 and G1 are isomorphic to each other. This means
 // that as long as we are careful, we can use this library to carry out a
-// computation that is logically equivalent to the case where G1 and G2 happen
+// computation that is logically equivalent to the case where G2 and G1 happen
 // to be the same group G.
 //
-// For simplicity, take G = G1. In other words, choose the G used in Boneh's
-// algorithms to be the group G1 provided by bn256.
+// For simplicity, take G = G2. In other words, choose the G used in Boneh's
+// algorithms to be the group G2 provided by bn256.
 //
-// In order for this work, we need to choose a single isomorphism phi: G1 -> G2
-// and stick with it for all operations. Let g1 be the base of G1, and g2 be the
-// base of G2, as provided via the APIs of bn256. We define phi as follows:
-// phi(g1 ^ a) = g2 ^ a, for all a in Z. This is well defined because G1 is
+// In order for this work, we need to choose a single isomorphism phi: G2 -> G1
+// and stick with it for all operations. Let g1 be the base of G2, and g2 be the
+// base of G1, as provided via the APIs of bn256. We define phi as follows:
+// phi(g1 ^ a) = g2 ^ a, for all a in Z. This is well defined because G2 is
 // isomorphic to Zp, a cyclic group.
 //
 // What this means is that, if we are working with some x in G to implement the
-// algorithm, then we must do so using g1 ^ k in G1 and g2 ^ k in G2, where
+// algorithm, then we must do so using g1 ^ k in G2 and g2 ^ k in G1, where
 // g1 ^ k = x. Using this method, we can emulate the requirements of Boneh's
 // algorithm.
+//
+// Furthermore, note that a marshalled G1 element is 64 bytes, whereas a
+// marshalled G2 element is 128 bytes. Therefore, we actually switch the order
+// of arguments to the bilinear map e so that marshalled parameters and keys are
+// smaller (since otherwise, more elements are passed as the secone argument and
+// therefore take up a lot of space). Note that switching the order of arguments
+// to a bilinear map (asymmetric or otherwise) maintains bilinearity.
 //
 // One more thing to note is that the group, as described in the paper, is
 // multiplicative, whereas the bn256 library uses additive notation. Keep this
@@ -46,11 +53,11 @@ import (
 
 // Params represents the system parameters for a hierarchy.
 type Params struct {
-	g  *bn256.G1
-	g1 *bn256.G1
-	g2 *bn256.G2
-	g3 *bn256.G2
-	h  []*bn256.G2
+	g  *bn256.G2
+	g1 *bn256.G2
+	g2 *bn256.G1
+	g3 *bn256.G1
+	h  []*bn256.G1
 
 	// Some cached state
 	pairing *bn256.GT
@@ -58,7 +65,7 @@ type Params struct {
 
 // MasterKey represents the key for a hierarchy that can create a key for any
 // element.
-type MasterKey *bn256.G2
+type MasterKey *bn256.G1
 
 // MaximumDepth returns the maximum depth of the hierarchy. This was specified
 // via the "l" argument when Setup was called.
@@ -70,16 +77,16 @@ func (params *Params) MaximumDepth() int {
 // messages encrypted with that ID and issue keys for children of that ID in
 // the hierarchy.
 type PrivateKey struct {
-	a0 *bn256.G2
-	a1 *bn256.G1
-	b  []*bn256.G2
+	a0 *bn256.G1
+	a1 *bn256.G2
+	b  []*bn256.G1
 }
 
 // Ciphertext represents an encrypted message.
 type Ciphertext struct {
 	a *bn256.GT
-	b *bn256.G1
-	c *bn256.G2
+	b *bn256.G2
+	c *bn256.G1
 }
 
 // DepthLeft returns the maximum depth of descendants in the hierarchy whose
@@ -98,7 +105,7 @@ func Setup(random io.Reader, l int) (*Params, MasterKey, error) {
 	// The algorithm technically needs g to be a generator of G, but since G is
 	// isomorphic to Zp, any element in G is technically a generator. So, we
 	// just choose a random element.
-	_, params.g, err = bn256.RandomG1(random)
+	_, params.g, err = bn256.RandomG2(random)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -110,29 +117,29 @@ func Setup(random io.Reader, l int) (*Params, MasterKey, error) {
 	}
 
 	// Choose g1 = g ^ alpha.
-	params.g1 = new(bn256.G1).ScalarMult(params.g, alpha)
+	params.g1 = new(bn256.G2).ScalarMult(params.g, alpha)
 
 	// Randomly choose g2 and g3.
-	_, params.g2, err = bn256.RandomG2(random)
+	_, params.g2, err = bn256.RandomG1(random)
 	if err != nil {
 		return nil, nil, err
 	}
-	_, params.g3, err = bn256.RandomG2(random)
+	_, params.g3, err = bn256.RandomG1(random)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Randomly choose h1 ... hl.
-	params.h = make([]*bn256.G2, l, l)
+	params.h = make([]*bn256.G1, l, l)
 	for i := range params.h {
-		_, params.h[i], err = bn256.RandomG2(random)
+		_, params.h[i], err = bn256.RandomG1(random)
 		if err != nil {
 			return nil, nil, err
 		}
 	}
 
 	// Compute the master key as g2 ^ alpha.
-	master := new(bn256.G2).ScalarMult(params.g2, alpha)
+	master := new(bn256.G1).ScalarMult(params.g2, alpha)
 
 	return params, master, nil
 }
@@ -152,19 +159,19 @@ func KeyGenFromMaster(random io.Reader, params *Params, master MasterKey, id []*
 		return nil, err
 	}
 
-	product := new(bn256.G2).ScalarMult(params.h[0], id[0])
+	product := new(bn256.G1).ScalarMult(params.h[0], id[0])
 	for i := 1; i != k; i++ {
-		h := new(bn256.G2).ScalarMult(params.h[i], id[i])
+		h := new(bn256.G1).ScalarMult(params.h[i], id[i])
 		product.Add(product, h)
 	}
 	product.Add(product, params.g3)
 	product.ScalarMult(product, r)
 
-	key.a0 = new(bn256.G2).Add(master, product)
-	key.a1 = new(bn256.G1).ScalarMult(params.g, r)
-	key.b = make([]*bn256.G2, l-k)
+	key.a0 = new(bn256.G1).Add(master, product)
+	key.a1 = new(bn256.G2).ScalarMult(params.g, r)
+	key.b = make([]*bn256.G1, l-k)
 	for j := 0; j != l-k; j++ {
-		key.b[j] = new(bn256.G2).ScalarMult(params.h[k+j], r)
+		key.b[j] = new(bn256.G1).ScalarMult(params.h[k+j], r)
 	}
 
 	return key, nil
@@ -190,25 +197,25 @@ func KeyGenFromParent(random io.Reader, params *Params, parent *PrivateKey, id [
 		return nil, err
 	}
 
-	product := new(bn256.G2).ScalarMult(params.h[0], id[0])
+	product := new(bn256.G1).ScalarMult(params.h[0], id[0])
 	for i := 1; i != k; i++ {
-		h := new(bn256.G2).ScalarMult(params.h[i], id[i])
+		h := new(bn256.G1).ScalarMult(params.h[i], id[i])
 		product.Add(product, h)
 	}
 	product.Add(product, params.g3)
 	product.ScalarMult(product, t)
 
-	bpower := new(bn256.G2).ScalarMult(parent.b[0], id[k-1])
+	bpower := new(bn256.G1).ScalarMult(parent.b[0], id[k-1])
 
-	key.a0 = new(bn256.G2).Add(parent.a0, bpower)
+	key.a0 = new(bn256.G1).Add(parent.a0, bpower)
 	key.a0.Add(key.a0, product)
 
-	key.a1 = new(bn256.G1).ScalarMult(params.g, t)
+	key.a1 = new(bn256.G2).ScalarMult(params.g, t)
 	key.a1.Add(parent.a1, key.a1)
 
-	key.b = make([]*bn256.G2, l-k)
+	key.b = make([]*bn256.G1, l-k)
 	for j := 0; j != l-k; j++ {
-		key.b[j] = new(bn256.G2).ScalarMult(params.h[k+j], t)
+		key.b[j] = new(bn256.G1).ScalarMult(params.h[k+j], t)
 		key.b[j].Add(parent.b[j+1], key.b[j])
 	}
 
@@ -228,18 +235,18 @@ func Encrypt(random io.Reader, params *Params, id []*big.Int, message *bn256.GT)
 	}
 
 	if params.pairing == nil {
-		params.pairing = bn256.Pair(params.g1, params.g2)
+		params.pairing = bn256.Pair(params.g2, params.g1)
 	}
 
 	ciphertext.a = new(bn256.GT)
 	ciphertext.a.ScalarMult(params.pairing, s)
 	ciphertext.a.Add(ciphertext.a, message)
 
-	ciphertext.b = new(bn256.G1).ScalarMult(params.g, s)
+	ciphertext.b = new(bn256.G2).ScalarMult(params.g, s)
 
-	ciphertext.c = new(bn256.G2).ScalarMult(params.h[0], id[0])
+	ciphertext.c = new(bn256.G1).ScalarMult(params.h[0], id[0])
 	for i := 1; i != k; i++ {
-		h := new(bn256.G2).ScalarMult(params.h[i], id[i])
+		h := new(bn256.G1).ScalarMult(params.h[i], id[i])
 		ciphertext.c.Add(ciphertext.c, h)
 	}
 	ciphertext.c.Add(ciphertext.c, params.g3)
@@ -251,8 +258,8 @@ func Encrypt(random io.Reader, params *Params, id []*big.Int, message *bn256.GT)
 // Decrypt recovers the original message from the provided ciphertext, using
 // the provided private key.
 func Decrypt(key *PrivateKey, ciphertext *Ciphertext) *bn256.GT {
-	plaintext := bn256.Pair(key.a1, ciphertext.c)
-	invdenominator := new(bn256.GT).Neg(bn256.Pair(ciphertext.b, key.a0))
+	plaintext := bn256.Pair(ciphertext.c, key.a1)
+	invdenominator := new(bn256.GT).Neg(bn256.Pair(key.a0, ciphertext.b))
 	plaintext.Add(plaintext, invdenominator)
 	plaintext.Add(ciphertext.a, plaintext)
 	return plaintext
