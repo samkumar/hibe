@@ -222,6 +222,16 @@ func KeyGenFromParent(random io.Reader, params *Params, parent *PrivateKey, id [
 	return key, nil
 }
 
+// Precache forces "cached params" to be computed. Normally, they are computed
+// on the fly, but that is not thread-safe. If you plan to call functions
+// (especially Encrypt) multiple times concurrently, you should call this first,
+// to eliminate race conditions.
+func Precache(params *Params) {
+	if params.pairing == nil {
+		params.pairing = bn256.Pair(params.g2, params.g1)
+	}
+}
+
 // Encrypt converts the provided message to ciphertext, using the provided ID
 // as the public key.
 func Encrypt(random io.Reader, params *Params, id []*big.Int, message *bn256.GT) (*Ciphertext, error) {

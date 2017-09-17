@@ -163,6 +163,40 @@ func BenchmarkEncrypt(b *testing.B) {
 	}
 }
 
+func BenchmarkEncryptLarge(b *testing.B) {
+	var err error
+	b.StopTimer()
+
+	// Generate a large ID
+	idLength := 20
+	id := make([]*big.Int, idLength)
+	for j := 0; j != idLength; j++ {
+		id[j], err = rand.Int(rand.Reader, bn256.Order)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+
+	// Set up parameters
+	params, _, err := Setup(rand.Reader, 20)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	for i := 0; i < b.N; i++ {
+		message, err := NewRandomMessage(rand.Reader)
+		if err != nil {
+			b.Fatal(err)
+		}
+		b.StartTimer()
+		_, err = Encrypt(rand.Reader, params, id, message)
+		if err != nil {
+			b.Fatal(err)
+		}
+		b.StopTimer()
+	}
+}
+
 func BenchmarkKeyGenFromMaster(b *testing.B) {
 	b.StopTimer()
 
