@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"testing"
 
-	"golang.org/x/crypto/bn256"
+	"vuvuzela.io/crypto/bn256"
 )
 
 var ID = []string{"a", "b", "c"}

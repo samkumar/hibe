@@ -48,7 +48,7 @@ import (
 	"io"
 	"math/big"
 
-	"golang.org/x/crypto/bn256"
+	"vuvuzela.io/crypto/bn256"
 )
 
 // Params represents the system parameters for a hierarchy.

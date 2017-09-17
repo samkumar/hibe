@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"math/big"
 
-	"golang.org/x/crypto/bn256"
+	"vuvuzela.io/crypto/bn256"
 )
 
 // geSize is the base size in bytes of a marshalled group element. The size of

@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"testing"
 
-	"golang.org/x/crypto/bn256"
+	"vuvuzela.io/crypto/bn256"
 )
 
 var LINEAR_HIERARCHY = []*big.Int{big.NewInt(1), big.NewInt(2), big.NewInt(3)}
