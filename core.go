@@ -53,11 +53,11 @@ import (
 
 // Params represents the system parameters for a hierarchy.
 type Params struct {
-	g  *bn256.G2
-	g1 *bn256.G2
-	g2 *bn256.G1
-	g3 *bn256.G1
-	h  []*bn256.G1
+	G  *bn256.G2
+	G1 *bn256.G2
+	G2 *bn256.G1
+	G3 *bn256.G1
+	H  []*bn256.G1
 
 	// Some cached state
 	pairing *bn256.GT
@@ -70,29 +70,29 @@ type MasterKey *bn256.G1
 // MaximumDepth returns the maximum depth of the hierarchy. This was specified
 // via the "l" argument when Setup was called.
 func (params *Params) MaximumDepth() int {
-	return len(params.h)
+	return len(params.H)
 }
 
 // PrivateKey represents a key for an ID in a hierarchy that can decrypt
 // messages encrypted with that ID and issue keys for children of that ID in
 // the hierarchy.
 type PrivateKey struct {
-	a0 *bn256.G1
-	a1 *bn256.G2
-	b  []*bn256.G1
+	A0 *bn256.G1
+	A1 *bn256.G2
+	B  []*bn256.G1
 }
 
 // Ciphertext represents an encrypted message.
 type Ciphertext struct {
-	a *bn256.GT
-	b *bn256.G2
-	c *bn256.G1
+	A *bn256.GT
+	B *bn256.G2
+	C *bn256.G1
 }
 
 // DepthLeft returns the maximum depth of descendants in the hierarchy whose
 // keys can be generated from this one.
 func (privkey *PrivateKey) DepthLeft() int {
-	return len(privkey.b)
+	return len(privkey.B)
 }
 
 // Setup generates the system parameters, (hich may be made visible to an
@@ -105,7 +105,7 @@ func Setup(random io.Reader, l int) (*Params, MasterKey, error) {
 	// The algorithm technically needs g to be a generator of G, but since G is
 	// isomorphic to Zp, any element in G is technically a generator. So, we
 	// just choose a random element.
-	_, params.g, err = bn256.RandomG2(random)
+	_, params.G, err = bn256.RandomG2(random)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -117,29 +117,29 @@ func Setup(random io.Reader, l int) (*Params, MasterKey, error) {
 	}
 
 	// Choose g1 = g ^ alpha.
-	params.g1 = new(bn256.G2).ScalarMult(params.g, alpha)
+	params.G1 = new(bn256.G2).ScalarMult(params.G, alpha)
 
 	// Randomly choose g2 and g3.
-	_, params.g2, err = bn256.RandomG1(random)
+	_, params.G2, err = bn256.RandomG1(random)
 	if err != nil {
 		return nil, nil, err
 	}
-	_, params.g3, err = bn256.RandomG1(random)
+	_, params.G3, err = bn256.RandomG1(random)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Randomly choose h1 ... hl.
-	params.h = make([]*bn256.G1, l, l)
-	for i := range params.h {
-		_, params.h[i], err = bn256.RandomG1(random)
+	params.H = make([]*bn256.G1, l, l)
+	for i := range params.H {
+		_, params.H[i], err = bn256.RandomG1(random)
 		if err != nil {
 			return nil, nil, err
 		}
 	}
 
 	// Compute the master key as g2 ^ alpha.
-	master := new(bn256.G1).ScalarMult(params.g2, alpha)
+	master := new(bn256.G1).ScalarMult(params.G2, alpha)
 
 	return params, master, nil
 }
@@ -148,7 +148,7 @@ func Setup(random io.Reader, l int) (*Params, MasterKey, error) {
 func KeyGenFromMaster(random io.Reader, params *Params, master MasterKey, id []*big.Int) (*PrivateKey, error) {
 	key := &PrivateKey{}
 	k := len(id)
-	l := len(params.h)
+	l := len(params.H)
 	if k > l {
 		panic("Cannot generate key at greater than maximum depth.")
 	}
@@ -159,19 +159,19 @@ func KeyGenFromMaster(random io.Reader, params *Params, master MasterKey, id []*
 		return nil, err
 	}
 
-	product := new(bn256.G1).ScalarMult(params.h[0], id[0])
+	product := new(bn256.G1).ScalarMult(params.H[0], id[0])
 	for i := 1; i != k; i++ {
-		h := new(bn256.G1).ScalarMult(params.h[i], id[i])
+		h := new(bn256.G1).ScalarMult(params.H[i], id[i])
 		product.Add(product, h)
 	}
-	product.Add(product, params.g3)
+	product.Add(product, params.G3)
 	product.ScalarMult(product, r)
 
-	key.a0 = new(bn256.G1).Add(master, product)
-	key.a1 = new(bn256.G2).ScalarMult(params.g, r)
-	key.b = make([]*bn256.G1, l-k)
+	key.A0 = new(bn256.G1).Add(master, product)
+	key.A1 = new(bn256.G2).ScalarMult(params.G, r)
+	key.B = make([]*bn256.G1, l-k)
 	for j := 0; j != l-k; j++ {
-		key.b[j] = new(bn256.G1).ScalarMult(params.h[k+j], r)
+		key.B[j] = new(bn256.G1).ScalarMult(params.H[k+j], r)
 	}
 
 	return key, nil
@@ -183,7 +183,7 @@ func KeyGenFromMaster(random io.Reader, params *Params, master MasterKey, id []*
 func KeyGenFromParent(random io.Reader, params *Params, parent *PrivateKey, id []*big.Int) (*PrivateKey, error) {
 	key := &PrivateKey{}
 	k := len(id)
-	l := len(params.h)
+	l := len(params.H)
 	if k > l {
 		panic("Cannot generate key at greater than maximum depth")
 	}
@@ -197,26 +197,26 @@ func KeyGenFromParent(random io.Reader, params *Params, parent *PrivateKey, id [
 		return nil, err
 	}
 
-	product := new(bn256.G1).ScalarMult(params.h[0], id[0])
+	product := new(bn256.G1).ScalarMult(params.H[0], id[0])
 	for i := 1; i != k; i++ {
-		h := new(bn256.G1).ScalarMult(params.h[i], id[i])
+		h := new(bn256.G1).ScalarMult(params.H[i], id[i])
 		product.Add(product, h)
 	}
-	product.Add(product, params.g3)
+	product.Add(product, params.G3)
 	product.ScalarMult(product, t)
 
-	bpower := new(bn256.G1).ScalarMult(parent.b[0], id[k-1])
+	bpower := new(bn256.G1).ScalarMult(parent.B[0], id[k-1])
 
-	key.a0 = new(bn256.G1).Add(parent.a0, bpower)
-	key.a0.Add(key.a0, product)
+	key.A0 = new(bn256.G1).Add(parent.A0, bpower)
+	key.A0.Add(key.A0, product)
 
-	key.a1 = new(bn256.G2).ScalarMult(params.g, t)
-	key.a1.Add(parent.a1, key.a1)
+	key.A1 = new(bn256.G2).ScalarMult(params.G, t)
+	key.A1.Add(parent.A1, key.A1)
 
-	key.b = make([]*bn256.G1, l-k)
+	key.B = make([]*bn256.G1, l-k)
 	for j := 0; j != l-k; j++ {
-		key.b[j] = new(bn256.G1).ScalarMult(params.h[k+j], t)
-		key.b[j].Add(parent.b[j+1], key.b[j])
+		key.B[j] = new(bn256.G1).ScalarMult(params.H[k+j], t)
+		key.B[j].Add(parent.B[j+1], key.B[j])
 	}
 
 	return key, nil
@@ -228,7 +228,7 @@ func KeyGenFromParent(random io.Reader, params *Params, parent *PrivateKey, id [
 // to eliminate race conditions.
 func Precache(params *Params) {
 	if params.pairing == nil {
-		params.pairing = bn256.Pair(params.g2, params.g1)
+		params.pairing = bn256.Pair(params.G2, params.G1)
 	}
 }
 
@@ -245,22 +245,22 @@ func Encrypt(random io.Reader, params *Params, id []*big.Int, message *bn256.GT)
 	}
 
 	if params.pairing == nil {
-		params.pairing = bn256.Pair(params.g2, params.g1)
+		params.pairing = bn256.Pair(params.G2, params.G1)
 	}
 
-	ciphertext.a = new(bn256.GT)
-	ciphertext.a.ScalarMult(params.pairing, s)
-	ciphertext.a.Add(ciphertext.a, message)
+	ciphertext.A = new(bn256.GT)
+	ciphertext.A.ScalarMult(params.pairing, s)
+	ciphertext.A.Add(ciphertext.A, message)
 
-	ciphertext.b = new(bn256.G2).ScalarMult(params.g, s)
+	ciphertext.B = new(bn256.G2).ScalarMult(params.G, s)
 
-	ciphertext.c = new(bn256.G1).ScalarMult(params.h[0], id[0])
+	ciphertext.C = new(bn256.G1).ScalarMult(params.H[0], id[0])
 	for i := 1; i != k; i++ {
-		h := new(bn256.G1).ScalarMult(params.h[i], id[i])
-		ciphertext.c.Add(ciphertext.c, h)
+		h := new(bn256.G1).ScalarMult(params.H[i], id[i])
+		ciphertext.C.Add(ciphertext.C, h)
 	}
-	ciphertext.c.Add(ciphertext.c, params.g3)
-	ciphertext.c.ScalarMult(ciphertext.c, s)
+	ciphertext.C.Add(ciphertext.C, params.G3)
+	ciphertext.C.ScalarMult(ciphertext.C, s)
 
 	return ciphertext, nil
 }
@@ -268,9 +268,9 @@ func Encrypt(random io.Reader, params *Params, id []*big.Int, message *bn256.GT)
 // Decrypt recovers the original message from the provided ciphertext, using
 // the provided private key.
 func Decrypt(key *PrivateKey, ciphertext *Ciphertext) *bn256.GT {
-	plaintext := bn256.Pair(ciphertext.c, key.a1)
-	invdenominator := new(bn256.GT).Neg(bn256.Pair(key.a0, ciphertext.b))
+	plaintext := bn256.Pair(ciphertext.C, key.A1)
+	invdenominator := new(bn256.GT).Neg(bn256.Pair(key.A0, ciphertext.B))
 	plaintext.Add(plaintext, invdenominator)
-	plaintext.Add(ciphertext.a, plaintext)
+	plaintext.Add(ciphertext.A, plaintext)
 	return plaintext
 }

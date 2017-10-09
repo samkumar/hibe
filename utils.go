@@ -21,13 +21,13 @@ func geIndex(encoded []byte, index int, len int) []byte {
 
 // Marshal encodes the parameters as a byte slice.
 func (params *Params) Marshal() []byte {
-	marshalled := make([]byte, (6+len(params.h))<<geShift)
+	marshalled := make([]byte, (6+len(params.H))<<geShift)
 
-	copy(geIndex(marshalled, 0, 2), params.g.Marshal())
-	copy(geIndex(marshalled, 2, 2), params.g1.Marshal())
-	copy(geIndex(marshalled, 4, 1), params.g2.Marshal())
-	copy(geIndex(marshalled, 5, 2), params.g3.Marshal())
-	for i, hi := range params.h {
+	copy(geIndex(marshalled, 0, 2), params.G.Marshal())
+	copy(geIndex(marshalled, 2, 2), params.G1.Marshal())
+	copy(geIndex(marshalled, 4, 1), params.G2.Marshal())
+	copy(geIndex(marshalled, 5, 2), params.G3.Marshal())
+	for i, hi := range params.H {
 		copy(geIndex(marshalled, 6+i, 1), hi.Marshal())
 	}
 
@@ -40,31 +40,31 @@ func (params *Params) Unmarshal(marshalled []byte) (*Params, bool) {
 		return nil, false
 	}
 
-	params.g = new(bn256.G2)
-	if _, ok := params.g.Unmarshal(geIndex(marshalled, 0, 2)); !ok {
+	params.G = new(bn256.G2)
+	if _, ok := params.G.Unmarshal(geIndex(marshalled, 0, 2)); !ok {
 		return nil, false
 	}
 
-	params.g1 = new(bn256.G2)
-	if _, ok := params.g1.Unmarshal(geIndex(marshalled, 2, 2)); !ok {
+	params.G1 = new(bn256.G2)
+	if _, ok := params.G1.Unmarshal(geIndex(marshalled, 2, 2)); !ok {
 		return nil, false
 	}
 
-	params.g2 = new(bn256.G1)
-	if _, ok := params.g2.Unmarshal(geIndex(marshalled, 4, 1)); !ok {
+	params.G2 = new(bn256.G1)
+	if _, ok := params.G2.Unmarshal(geIndex(marshalled, 4, 1)); !ok {
 		return nil, false
 	}
 
-	params.g3 = new(bn256.G1)
-	if _, ok := params.g3.Unmarshal(geIndex(marshalled, 5, 1)); !ok {
+	params.G3 = new(bn256.G1)
+	if _, ok := params.G3.Unmarshal(geIndex(marshalled, 5, 1)); !ok {
 		return nil, false
 	}
 
 	hlen := (len(marshalled) >> geShift) - 6
-	params.h = make([]*bn256.G1, hlen, hlen)
-	for i := range params.h {
+	params.H = make([]*bn256.G1, hlen, hlen)
+	for i := range params.H {
 		hi := new(bn256.G1)
-		params.h[i] = hi
+		params.H[i] = hi
 		if _, ok := hi.Unmarshal(geIndex(marshalled, 6+i, 1)); !ok {
 			return params, false
 		}
@@ -78,11 +78,11 @@ func (params *Params) Unmarshal(marshalled []byte) (*Params, bool) {
 
 // Marshal encodes the private key as a byte slice.
 func (key *PrivateKey) Marshal() []byte {
-	marshalled := make([]byte, (3+len(key.b))<<geShift)
+	marshalled := make([]byte, (3+len(key.B))<<geShift)
 
-	copy(geIndex(marshalled, 0, 1), key.a0.Marshal())
-	copy(geIndex(marshalled, 1, 2), key.a1.Marshal())
-	for i, bi := range key.b {
+	copy(geIndex(marshalled, 0, 1), key.A0.Marshal())
+	copy(geIndex(marshalled, 1, 2), key.A1.Marshal())
+	for i, bi := range key.B {
 		copy(geIndex(marshalled, 3+i, 1), bi.Marshal())
 	}
 
@@ -95,21 +95,21 @@ func (key *PrivateKey) Unmarshal(marshalled []byte) (*PrivateKey, bool) {
 		return nil, false
 	}
 
-	key.a0 = new(bn256.G1)
-	if _, ok := key.a0.Unmarshal(geIndex(marshalled, 0, 1)); !ok {
+	key.A0 = new(bn256.G1)
+	if _, ok := key.A0.Unmarshal(geIndex(marshalled, 0, 1)); !ok {
 		return nil, false
 	}
 
-	key.a1 = new(bn256.G2)
-	if _, ok := key.a1.Unmarshal(geIndex(marshalled, 1, 2)); !ok {
+	key.A1 = new(bn256.G2)
+	if _, ok := key.A1.Unmarshal(geIndex(marshalled, 1, 2)); !ok {
 		return nil, false
 	}
 
 	blen := (len(marshalled) >> geShift) - 3
-	key.b = make([]*bn256.G1, blen, blen)
-	for i := range key.b {
+	key.B = make([]*bn256.G1, blen, blen)
+	for i := range key.B {
 		bi := new(bn256.G1)
-		key.b[i] = bi
+		key.B[i] = bi
 		if _, ok := bi.Unmarshal(geIndex(marshalled, 3+i, 1)); !ok {
 			return key, false
 		}
@@ -122,9 +122,9 @@ func (key *PrivateKey) Unmarshal(marshalled []byte) (*PrivateKey, bool) {
 func (ciphertext *Ciphertext) Marshal() []byte {
 	marshalled := make([]byte, 9<<geShift)
 
-	copy(geIndex(marshalled, 0, 6), ciphertext.a.Marshal())
-	copy(geIndex(marshalled, 6, 2), ciphertext.b.Marshal())
-	copy(geIndex(marshalled, 8, 1), ciphertext.c.Marshal())
+	copy(geIndex(marshalled, 0, 6), ciphertext.A.Marshal())
+	copy(geIndex(marshalled, 6, 2), ciphertext.B.Marshal())
+	copy(geIndex(marshalled, 8, 1), ciphertext.C.Marshal())
 
 	return marshalled
 }
@@ -135,16 +135,16 @@ func (ciphertext *Ciphertext) Unmarshal(marshalled []byte) (*Ciphertext, bool) {
 		return nil, false
 	}
 
-	ciphertext.a = new(bn256.GT)
-	if _, ok := ciphertext.a.Unmarshal(geIndex(marshalled, 0, 6)); !ok {
+	ciphertext.A = new(bn256.GT)
+	if _, ok := ciphertext.A.Unmarshal(geIndex(marshalled, 0, 6)); !ok {
 		return nil, false
 	}
-	ciphertext.b = new(bn256.G2)
-	if _, ok := ciphertext.b.Unmarshal(geIndex(marshalled, 6, 2)); !ok {
+	ciphertext.B = new(bn256.G2)
+	if _, ok := ciphertext.B.Unmarshal(geIndex(marshalled, 6, 2)); !ok {
 		return nil, false
 	}
-	ciphertext.c = new(bn256.G1)
-	if _, ok := ciphertext.c.Unmarshal(geIndex(marshalled, 8, 1)); !ok {
+	ciphertext.C = new(bn256.G1)
+	if _, ok := ciphertext.C.Unmarshal(geIndex(marshalled, 8, 1)); !ok {
 		return nil, false
 	}
 
