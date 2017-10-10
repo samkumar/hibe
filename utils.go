@@ -71,7 +71,7 @@ func (params *Params) Unmarshal(marshalled []byte) (*Params, bool) {
 	}
 
 	// Clear any cached values
-	params.pairing = nil
+	params.Pairing = nil
 
 	return params, true
 }
