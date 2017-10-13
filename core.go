@@ -226,7 +226,7 @@ func KeyGenFromParent(random io.Reader, params *Params, parent *PrivateKey, id [
 // on the fly, but that is not thread-safe. If you plan to call functions
 // (especially Encrypt) multiple times concurrently, you should call this first,
 // to eliminate race conditions.
-func Precache(params *Params) {
+func (params *Params) Precache() {
 	if params.Pairing == nil {
 		params.Pairing = bn256.Pair(params.G2, params.G1)
 	}
