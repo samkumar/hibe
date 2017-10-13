@@ -159,12 +159,11 @@ func KeyGenFromMaster(random io.Reader, params *Params, master MasterKey, id []*
 		return nil, err
 	}
 
-	product := new(bn256.G1).ScalarMult(params.H[0], id[0])
-	for i := 1; i != k; i++ {
+	product := new(bn256.G1).Set(params.G3)
+	for i := 0; i != k; i++ {
 		h := new(bn256.G1).ScalarMult(params.H[i], id[i])
 		product.Add(product, h)
 	}
-	product.Add(product, params.G3)
 	product.ScalarMult(product, r)
 
 	key.A0 = new(bn256.G1).Add(master, product)
@@ -197,12 +196,11 @@ func KeyGenFromParent(random io.Reader, params *Params, parent *PrivateKey, id [
 		return nil, err
 	}
 
-	product := new(bn256.G1).ScalarMult(params.H[0], id[0])
-	for i := 1; i != k; i++ {
+	product := new(bn256.G1).Set(params.G3)
+	for i := 0; i != k; i++ {
 		h := new(bn256.G1).ScalarMult(params.H[i], id[i])
 		product.Add(product, h)
 	}
-	product.Add(product, params.G3)
 	product.ScalarMult(product, t)
 
 	bpower := new(bn256.G1).ScalarMult(parent.B[0], id[k-1])
@@ -254,12 +252,11 @@ func Encrypt(random io.Reader, params *Params, id []*big.Int, message *bn256.GT)
 
 	ciphertext.B = new(bn256.G2).ScalarMult(params.G, s)
 
-	ciphertext.C = new(bn256.G1).ScalarMult(params.H[0], id[0])
-	for i := 1; i != k; i++ {
+	ciphertext.C = new(bn256.G1).Set(params.G3)
+	for i := 0; i != k; i++ {
 		h := new(bn256.G1).ScalarMult(params.H[i], id[i])
 		ciphertext.C.Add(ciphertext.C, h)
 	}
-	ciphertext.C.Add(ciphertext.C, params.G3)
 	ciphertext.C.ScalarMult(ciphertext.C, s)
 
 	return ciphertext, nil
