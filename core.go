@@ -1,5 +1,5 @@
 // Package hibe implements the cryptosystem described in the paper "Hierarchical
-// Identity Based Encyprtion with Constant Size Ciphertext" by Boneh, Boyen, and
+// Identity Based Encryption with Constant Size Ciphertext" by Boneh, Boyen, and
 // Goh.
 //
 // The algorithms call for us to use a group G that is bilinear, i.e,
